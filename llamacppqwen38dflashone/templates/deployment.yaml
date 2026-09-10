@@ -13,6 +13,7 @@ data:
   THREADS: "16"
   SPEC_DRAFT_N_MAX: "7"
   CHAT_TEMPLATE_URL: "https://huggingface.co/froggeric/Qwen-Fixed-Chat-Templates/resolve/855bffc49448e299789730ff92c9b8d834d6cc14/chat_template.jinja"
+{{- if .Values.enableDeployment }}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -51,40 +52,47 @@ spec:
           command: ["/bin/bash", "-c"]
           args:
             - |
-              set -e
+              set -euo pipefail
               MODELS_DIR=${MODELS_DIR:-/models}
               SHARED_DIR=${SHARED_DIR:-/shared-models/llms}
+              HF_BASE=${HF_ENDPOINT:-https://huggingface.co}
+              HF_BASE=${HF_BASE%/}
               mkdir -p "$MODELS_DIR" "$SHARED_DIR" /config
-              HF_AUTH=""
-              if [ -n "$HF_TOKEN" ]; then HF_AUTH="-H \"Authorization: Bearer $HF_TOKEN\""; fi
-              if [ -f "$MODELS_DIR/$TARGET_FILE" ] && [ ! -f "$SHARED_DIR/$TARGET_FILE.ok" ]; then
+              curl_args=(-fL -C - --retry 20 --retry-delay 15 --retry-all-errors --connect-timeout 30)
+              if [ -n "${HF_TOKEN:-}" ]; then
+                curl_args+=(-H "Authorization: Bearer ${HF_TOKEN}")
+              fi
+              download() {
+                local url="$1" destination="$2" marker="${2}.ok" part="${2}.part"
+                if [ -s "$destination" ] && [ -f "$marker" ]; then return 0; fi
+                rm -f "$marker"
+                echo "==> Downloading ${destination}"
+                curl "${curl_args[@]}" "$url" -o "$part"
+                test -s "$part"
+                mv -f "$part" "$destination"
+                touch "$marker"
+              }
+              if [ -f "$MODELS_DIR/$TARGET_FILE" ] && [ ! -s "$SHARED_DIR/$TARGET_FILE" ]; then
                 echo "==> Migrating $TARGET_FILE from per-app to shared"
                 mv "$MODELS_DIR/$TARGET_FILE" "$SHARED_DIR/$TARGET_FILE"
-                touch "$SHARED_DIR/$TARGET_FILE.ok"
+                rm -f "$MODELS_DIR/$TARGET_FILE.ok"
               fi
-              if [ ! -f "$SHARED_DIR/$TARGET_FILE.ok" ]; then
-                echo "==> Downloading shared target $TARGET_FILE"
-                eval curl -fL -C - --retry 20 --retry-delay 15 --retry-all-errors --connect-timeout 30 $HF_AUTH \
-                  "https://huggingface.co/${TARGET_MODEL}/resolve/main/${TARGET_FILE}" \
-                  -o "$SHARED_DIR/$TARGET_FILE"
-                touch "$SHARED_DIR/$TARGET_FILE.ok"
-              fi
-              if [ -f "$MODELS_DIR/$DRAFT_FILE" ] && [ ! -f "$SHARED_DIR/$DRAFT_FILE.ok" ]; then
+              if [ -f "$MODELS_DIR/$DRAFT_FILE" ] && [ ! -s "$SHARED_DIR/$DRAFT_FILE" ]; then
                 echo "==> Migrating $DRAFT_FILE from per-app to shared"
                 mv "$MODELS_DIR/$DRAFT_FILE" "$SHARED_DIR/$DRAFT_FILE"
-                touch "$SHARED_DIR/$DRAFT_FILE.ok"
+                rm -f "$MODELS_DIR/$DRAFT_FILE.ok"
               fi
-              if [ ! -f "$SHARED_DIR/$DRAFT_FILE.ok" ]; then
-                echo "==> Downloading DFlash2 drafter $DRAFT_FILE"
-                eval curl -fL -C - --retry 20 --retry-delay 15 --retry-all-errors --connect-timeout 30 $HF_AUTH \
-                  "https://huggingface.co/${DRAFT_MODEL}/resolve/main/${DRAFT_FILE}" \
-                  -o "$SHARED_DIR/$DRAFT_FILE"
-                touch "$SHARED_DIR/$DRAFT_FILE.ok"
-              fi
-              if [ ! -f /config/chat_template.jinja.ok ]; then
-                echo "==> Downloading pinned chat template"
-                eval curl -fL --retry 20 --retry-delay 15 --retry-all-errors --connect-timeout 30 $HF_AUTH \
-                  "$CHAT_TEMPLATE_URL" -o /config/chat_template.jinja
+              download "${HF_BASE}/${TARGET_MODEL}/resolve/main/${TARGET_FILE}" "$SHARED_DIR/$TARGET_FILE"
+              download "${HF_BASE}/${DRAFT_MODEL}/resolve/main/${DRAFT_FILE}" "$SHARED_DIR/$DRAFT_FILE"
+              if [ ! -s /config/chat_template.jinja ] || [ ! -f /config/chat_template.jinja.ok ]; then
+                rm -f /config/chat_template.jinja.ok
+                curl_args_no_resume=(-fL --retry 20 --retry-delay 15 --retry-all-errors --connect-timeout 30)
+                if [ -n "${HF_TOKEN:-}" ]; then
+                  curl_args_no_resume+=(-H "Authorization: Bearer ${HF_TOKEN}")
+                fi
+                curl "${curl_args_no_resume[@]}" "${CHAT_TEMPLATE_URL}" -o /config/chat_template.jinja.part
+                test -s /config/chat_template.jinja.part
+                mv -f /config/chat_template.jinja.part /config/chat_template.jinja
                 touch /config/chat_template.jinja.ok
               fi
               exec /usr/local/bin/llama-server \
@@ -183,3 +191,4 @@ spec:
       targetPort: 8000
   selector:
     io.kompose.service: llamacppqwen38dflashone
+{{- end }}
