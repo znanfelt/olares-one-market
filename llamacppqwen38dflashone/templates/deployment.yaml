@@ -1,3 +1,4 @@
+---
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -9,11 +10,13 @@ data:
   DRAFT_MODEL: "incoai/Qwen3.8-27B-DFlash2-GGUF"
   DRAFT_FILE: "Qwen3.8-27B-DFlash2-Q4_K_M.gguf"
   MODEL_ALIAS: "qwen3.8-27b-dflash2"
-  CTX_SIZE: "98304"
+  # 200K context matches the community-validated bayerhazard config
+  # (Olares One RTX 5090M 24GB, turbo4 KV, DFlash2 n-max 7 → 80-110 t/s).
+  CTX_SIZE: "204800"
   THREADS: "16"
   SPEC_DRAFT_N_MAX: "7"
+  CACHE_TYPE: "turbo4"
   CHAT_TEMPLATE_URL: "https://huggingface.co/froggeric/Qwen-Fixed-Chat-Templates/resolve/855bffc49448e299789730ff92c9b8d834d6cc14/chat_template.jinja"
-{{- if .Values.enableDeployment }}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -58,43 +61,58 @@ spec:
               HF_BASE=${HF_ENDPOINT:-https://huggingface.co}
               HF_BASE=${HF_BASE%/}
               mkdir -p "$MODELS_DIR" "$SHARED_DIR" /config
+
+              # Safe curl args — no eval, quoted token
               curl_args=(-fL -C - --retry 20 --retry-delay 15 --retry-all-errors --connect-timeout 30)
               if [ -n "${HF_TOKEN:-}" ]; then
                 curl_args+=(-H "Authorization: Bearer ${HF_TOKEN}")
               fi
+
+              # Download to .part, validate non-empty, atomic-rename, then write marker
               download() {
-                local url="$1" destination="$2" marker="${2}.ok" part="${2}.part"
-                if [ -s "$destination" ] && [ -f "$marker" ]; then return 0; fi
+                local url="$1" destination="$2"
+                local marker="${destination}.ok"
+                local part="${destination}.part"
+                if [ -s "$destination" ] && [ -f "$marker" ]; then
+                  echo "==> Cached: ${destination}"
+                  return 0
+                fi
                 rm -f "$marker"
                 echo "==> Downloading ${destination}"
                 curl "${curl_args[@]}" "$url" -o "$part"
-                test -s "$part"
+                [ -s "$part" ] || { echo "empty download: $part"; exit 1; }
                 mv -f "$part" "$destination"
                 touch "$marker"
               }
+
+              # Migrate per-app model files to shared cache if present (legacy layout)
               if [ -f "$MODELS_DIR/$TARGET_FILE" ] && [ ! -s "$SHARED_DIR/$TARGET_FILE" ]; then
-                echo "==> Migrating $TARGET_FILE from per-app to shared"
+                echo "==> Migrating $TARGET_FILE to shared cache"
                 mv "$MODELS_DIR/$TARGET_FILE" "$SHARED_DIR/$TARGET_FILE"
                 rm -f "$MODELS_DIR/$TARGET_FILE.ok"
               fi
               if [ -f "$MODELS_DIR/$DRAFT_FILE" ] && [ ! -s "$SHARED_DIR/$DRAFT_FILE" ]; then
-                echo "==> Migrating $DRAFT_FILE from per-app to shared"
+                echo "==> Migrating $DRAFT_FILE to shared cache"
                 mv "$MODELS_DIR/$DRAFT_FILE" "$SHARED_DIR/$DRAFT_FILE"
                 rm -f "$MODELS_DIR/$DRAFT_FILE.ok"
               fi
+
               download "${HF_BASE}/${TARGET_MODEL}/resolve/main/${TARGET_FILE}" "$SHARED_DIR/$TARGET_FILE"
-              download "${HF_BASE}/${DRAFT_MODEL}/resolve/main/${DRAFT_FILE}" "$SHARED_DIR/$DRAFT_FILE"
+              download "${HF_BASE}/${DRAFT_MODEL}/resolve/main/${DRAFT_FILE}"   "$SHARED_DIR/$DRAFT_FILE"
+
+              # Chat template — small file, no resume
               if [ ! -s /config/chat_template.jinja ] || [ ! -f /config/chat_template.jinja.ok ]; then
                 rm -f /config/chat_template.jinja.ok
-                curl_args_no_resume=(-fL --retry 20 --retry-delay 15 --retry-all-errors --connect-timeout 30)
+                tpl_args=(-fL --retry 20 --retry-delay 15 --retry-all-errors --connect-timeout 30)
                 if [ -n "${HF_TOKEN:-}" ]; then
-                  curl_args_no_resume+=(-H "Authorization: Bearer ${HF_TOKEN}")
+                  tpl_args+=(-H "Authorization: Bearer ${HF_TOKEN}")
                 fi
-                curl "${curl_args_no_resume[@]}" "${CHAT_TEMPLATE_URL}" -o /config/chat_template.jinja.part
-                test -s /config/chat_template.jinja.part
+                curl "${tpl_args[@]}" "${CHAT_TEMPLATE_URL}" -o /config/chat_template.jinja.part
+                [ -s /config/chat_template.jinja.part ] || { echo "empty template"; exit 1; }
                 mv -f /config/chat_template.jinja.part /config/chat_template.jinja
                 touch /config/chat_template.jinja.ok
               fi
+
               exec /usr/local/bin/llama-server \
                 --model "$SHARED_DIR/$TARGET_FILE" \
                 --model-draft "$SHARED_DIR/$DRAFT_FILE" \
@@ -104,10 +122,10 @@ spec:
                 --n-gpu-layers 99 \
                 --n-gpu-layers-draft 99 \
                 --spec-draft-n-max "${SPEC_DRAFT_N_MAX:-7}" \
-                --ctx-size "${CTX_SIZE:-98304}" \
+                --ctx-size "${CTX_SIZE:-204800}" \
                 --threads "${THREADS:-16}" \
                 --threads-batch "${THREADS:-16}" \
-                --cache-type-k turbo3 --cache-type-v turbo3 \
+                --cache-type-k "${CACHE_TYPE:-turbo4}" --cache-type-v "${CACHE_TYPE:-turbo4}" \
                 --batch-size 512 --ubatch-size 512 \
                 --parallel 1 \
                 --flash-attn on --jinja \
@@ -126,8 +144,10 @@ spec:
               value: "{{ .Values.olaresEnv.OLARES_USER_HUGGINGFACE_TOKEN }}"
             - name: MODELS_DIR
               value: "/models"
+            # HAMi-core "0m" parsing bug workaround. Match the sibling Qwen3.6 DFlash
+            # chart (24400m ≈ 80 MB margin under hardware 24463 MB on the 5090M).
             - name: CUDA_DEVICE_MEMORY_LIMIT_0
-              value: "24000m"
+              value: "24400m"
           ports:
             - containerPort: 8000
           livenessProbe:
@@ -191,4 +211,3 @@ spec:
       targetPort: 8000
   selector:
     io.kompose.service: llamacppqwen38dflashone
-{{- end }}

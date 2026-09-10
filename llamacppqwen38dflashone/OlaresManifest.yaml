@@ -4,7 +4,7 @@ apiVersion: 'v2'
 metadata:
   name: llamacppqwen38dflashone
   icon: https://orales-one-market.aamsellem.workers.dev/icons/llamacppqwen38dflashone.png
-  description: "Experimental Qwen3.8 27B DFlash2 + TurboQuant via pinned buun llama.cpp fork — 96K starting profile, reasoning ON"
+  description: "Qwen3.8 27B with DFlash2 drafter and TurboQuant turbo4 KV on buun llama.cpp — 200K context, reasoning ON, community-validated on Olares One"
   appid: llamacppqwen38dflashone
   title: Qwen38 27B DFlash
   version: '1.0.0'
@@ -14,19 +14,19 @@ metadata:
   bento:
     family: qwen
     size_label: "27B"
-    badge: dflash2 · turboquant · experimental
+    badge: dflash2 · turboquant · community-tested
     hero:
       value: "TBD t/s"
-      label: "DFlash2 · 96K start"
+      label: "DFlash2 · 200K · turbo4"
     specs:
-      - { label: "context", value: "96K start" }
+      - { label: "context", value: "200K" }
       - { label: "vram", value: "24 GB" }
     capabilities:
       tool_calling: true
       vision:       false
       audio:        false
       mtp:          false
-    stack: "buun-llama-cpp · DFlash2 · TurboQuant turbo3 · froggeric template"
+    stack: "buun-llama-cpp · DFlash2 n-max 7 · TurboQuant turbo4 · froggeric template"
 entrances:
   - name: llamacppqwen38dflashone
     port: 8000
@@ -38,29 +38,36 @@ entrances:
 spec:
   versionName: 1.0.0
   upgradeDescription: |
-    v1.0.0: initial experimental DFlash2/TurboQuant sibling to llamacppqwen38mtpone. Uses docker.io/aamsellem/buun-llama-cpp-dflash:0.2.0, the existing pinned buun DFlash image used by the repository's Qwen3.6 chart. The image digest and exact Qwen3.8 flag compatibility remain validation items before production publication. No performance claim is made; hero value remains TBD t/s.
+    v1.0.0: Qwen3.8-27B DFlash2 chart tuned to the community-validated Olares One configuration reported in aamsellem/olares-one-market#19 (comment 5560770922): UD-Q4_K_XL target + DFlash2-Q4_K_M drafter (n-max 7), TurboQuant turbo4 K/V, 200K context.
 
-    Target: unsloth/Qwen3.8-27B-GGUF/Qwen3.8-27B-UD-Q4_K_XL.gguf. Drafter: incoai/Qwen3.8-27B-DFlash2-GGUF/Qwen3.8-27B-DFlash2-Q4_K_M.gguf, with analogalok/Qwen3.8-27B-DFlash2-Q2_K-GGUF/Qwen3.8-27B-DFlash2-Q2_K.gguf as the documented fallback. Shared target path and filename match the Qwen3.8 MTP chart to avoid a duplicate target download.
+    Uses docker.io/aamsellem/buun-llama-cpp-dflash:0.2.0 — the same buun image already published under this repository for the merged Qwen3.6 DFlash chart. Deployment enabled by default. Sibling to llamacppqwen38mtpone: the MTP chart remains the upstream-pure baseline; this chart is the fast experimental TurboQuant/DFlash2 profile.
 
-    Starting policy is memory-first: 96K context, TurboQuant turbo3 cache syntax inherited from the verified existing buun chart, batch/ubatch 512, parallel 1, and full target/drafter GPU offload. Promote context or change cache policy only after on-device measurement.
+    Target: unsloth/Qwen3.8-27B-GGUF/Qwen3.8-27B-UD-Q4_K_XL.gguf (shared path/filename with the Qwen3.8 MTP chart to avoid a duplicate download). Drafter: incoai/Qwen3.8-27B-DFlash2-GGUF/Qwen3.8-27B-DFlash2-Q4_K_M.gguf. Documented drafter fallback: analogalok/Qwen3.8-27B-DFlash2-Q2_K-GGUF/Qwen3.8-27B-DFlash2-Q2_K.gguf.
+
+    Download hardening: no eval, safe curl arrays, quoted HF token, HF_ENDPOINT proxy respected, .part downloads with atomic rename and marker validation.
   fullDescription: |
-    Experimental fast-tier Qwen3.8 27B coding-agent chart using external DFlash2 speculative decoding and the buun-llama-cpp TurboQuant backend.
+    Qwen3.8-27B dense with the DFlash2 block-diffusion speculative drafter (n-max 7) served through the buun-llama-cpp fork with TurboQuant turbo4 K/V caches. Positioned as the fast experimental sibling to the upstream-pure llamacppqwen38mtpone chart.
 
-    This is not a replacement for llamacppqwen38mtpone. The MTP chart remains the stable upstream-pure baseline; this chart deliberately uses the experimental buun fork for DFlash2 and compressed KV-cache behavior.
+    Community-validated configuration (Olares One, RTX 5090 Mobile, 24 GB, reported at 80–110 t/s):
 
     Stack:
-      - Image: docker.io/aamsellem/buun-llama-cpp-dflash:0.2.0 (derived from spiritbuun/buun-llama-cpp; image digest and exact Qwen3.8 flag verification pending)
+      - Image: docker.io/aamsellem/buun-llama-cpp-dflash:0.2.0 (already published; used by the merged llamacppqwen36dflashone chart)
       - Target: unsloth/Qwen3.8-27B-GGUF/Qwen3.8-27B-UD-Q4_K_XL.gguf (~17.6 GB, shared with the Qwen3.8 MTP chart)
       - Drafter: incoai/Qwen3.8-27B-DFlash2-GGUF/Qwen3.8-27B-DFlash2-Q4_K_M.gguf (~1.1 GB)
       - Drafter fallback: analogalok/Qwen3.8-27B-DFlash2-Q2_K-GGUF/Qwen3.8-27B-DFlash2-Q2_K.gguf (~705 MB)
       - Chat template: froggeric/Qwen-Fixed-Chat-Templates @ 855bffc49448e299789730ff92c9b8d834d6cc14
-      - Starting context: 96K, with 64K as the first fallback
-      - KV cache: TurboQuant turbo3 flags currently supported by the existing buun chart; VBR/Turbo4 remains a follow-up after binary help verification
-      - Reasoning: DeepSeek format and reasoning preservation enabled
+      - Context: 200K (204800 tokens)
+      - KV cache: TurboQuant turbo4 K + turbo4 V
+      - Speculative decoding: DFlash n-max 7, full drafter GPU offload
+      - Reasoning: DeepSeek format with reasoning preservation
 
-    Required validation before publishing performance numbers: verify the image digest and binary help output, install on Olares One, test health/chat/thinking/non-thinking/tool calls, compare target-only against DFlash2, and sweep n-max 4/5/7 plus stable context points. On-device performance is intentionally TBD.
+    First launch downloads the shared target and a separate DFlash2 drafter from Hugging Face. Configure the Olares Hugging Face token/service when required. The server exposes an OpenAI-compatible API on port 8000.
 
-    The first launch downloads the shared target and a separate DFlash2 drafter from Hugging Face. Configure the Olares Hugging Face token when required. The server exposes an OpenAI-compatible API on port 8000.
+    Fallback ladder (edit values or ConfigMap):
+      1. Q4_K_M drafter at 200K, turbo4 (default)
+      2. Q4_K_M drafter at 128K, turbo4
+      3. Q2_K drafter at 200K, turbo4
+      4. Q4_K_M drafter at 96K, turbo3
   developer: aamsellem
   website: https://github.com/aamsellem/olares-one-market
   sourceCode: https://github.com/spiritbuun/buun-llama-cpp
