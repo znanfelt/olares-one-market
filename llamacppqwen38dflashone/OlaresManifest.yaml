@@ -4,7 +4,7 @@ apiVersion: 'v2'
 metadata:
   name: llamacppqwen38dflashone
   icon: https://orales-one-market.aamsellem.workers.dev/icons/llamacppqwen38dflashone.png
-  description: "Qwen3.8 27B with DFlash2 drafter and TurboQuant turbo4 KV on buun llama.cpp — 200K context, reasoning ON, community-validated on Olares One"
+  description: "Qwen3.8 27B with DFlash2 drafter and TurboQuant turbo4 KV on buun llama.cpp — 200K context, community-validated on Olares One"
   appid: llamacppqwen38dflashone
   title: Qwen38 27B DFlash
   version: '1.0.0'
@@ -44,6 +44,8 @@ spec:
 
     Target: unsloth/Qwen3.8-27B-GGUF/Qwen3.8-27B-UD-Q4_K_XL.gguf (shared path/filename with the Qwen3.8 MTP chart to avoid a duplicate download). Drafter: incoai/Qwen3.8-27B-DFlash2-GGUF/Qwen3.8-27B-DFlash2-Q4_K_M.gguf. Documented drafter fallback: analogalok/Qwen3.8-27B-DFlash2-Q2_K-GGUF/Qwen3.8-27B-DFlash2-Q2_K.gguf.
 
+    First on-device run of the previous chart revision failed with 'invalid argument: --reasoning-preserve' on this binary. This revision removes both --reasoning-preserve and --reasoning-format to match the flag surface of the merged Qwen3.6 DFlash sibling chart; reasoning parsing is handled client-side (the froggeric template is still applied via --jinja + --chat-template-file).
+
     Download hardening: no eval, safe curl arrays, quoted HF token, HF_ENDPOINT proxy respected, .part downloads with atomic rename and marker validation.
   fullDescription: |
     Qwen3.8-27B dense with the DFlash2 block-diffusion speculative drafter (n-max 7) served through the buun-llama-cpp fork with TurboQuant turbo4 K/V caches. Positioned as the fast experimental sibling to the upstream-pure llamacppqwen38mtpone chart.
@@ -55,11 +57,11 @@ spec:
       - Target: unsloth/Qwen3.8-27B-GGUF/Qwen3.8-27B-UD-Q4_K_XL.gguf (~17.6 GB, shared with the Qwen3.8 MTP chart)
       - Drafter: incoai/Qwen3.8-27B-DFlash2-GGUF/Qwen3.8-27B-DFlash2-Q4_K_M.gguf (~1.1 GB)
       - Drafter fallback: analogalok/Qwen3.8-27B-DFlash2-Q2_K-GGUF/Qwen3.8-27B-DFlash2-Q2_K.gguf (~705 MB)
-      - Chat template: froggeric/Qwen-Fixed-Chat-Templates @ 855bffc49448e299789730ff92c9b8d834d6cc14
+      - Chat template: froggeric/Qwen-Fixed-Chat-Templates @ 855bffc49448e299789730ff92c9b8d834d6cc14 via --jinja + --chat-template-file
       - Context: 200K (204800 tokens)
       - KV cache: TurboQuant turbo4 K + turbo4 V
       - Speculative decoding: DFlash n-max 7, full drafter GPU offload
-      - Reasoning: DeepSeek format with reasoning preservation
+      - Reasoning parsing: handled client-side (the buun 0.2.0 binary rejects --reasoning-preserve; add server-side reasoning flags in a follow-up once the image supports them)
 
     First launch downloads the shared target and a separate DFlash2 drafter from Hugging Face. Configure the Olares Hugging Face token/service when required. The server exposes an OpenAI-compatible API on port 8000.
 

@@ -129,9 +129,7 @@ spec:
                 --batch-size 512 --ubatch-size 512 \
                 --parallel 1 \
                 --flash-attn on --jinja \
-                --chat-template-file /config/chat_template.jinja \
-                --reasoning-format deepseek \
-                --reasoning-preserve
+                --chat-template-file /config/chat_template.jinja
           envFrom:
             - configMapRef:
                 name: llamacpp-qwen38-dflash-env
