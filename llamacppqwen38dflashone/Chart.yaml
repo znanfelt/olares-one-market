@@ -1,6 +1,6 @@
 apiVersion: v2
-appVersion: '1.0.1'
-description: Qwen3.8 27B dense + DFlash2 drafter + TurboQuant turbo4 K/V on buun llama.cpp — 200K context, community-validated on Olares One
+appVersion: '2.0.0'
+description: Qwen3.8 27B dense + DFlash2 drafter + kvarn4 KV on BeeLlama CUDA 13.3 — 200K context on the Olares One
 name: llamacppqwen38dflashone
 type: application
-version: '1.0.1'
+version: '2.0.0'

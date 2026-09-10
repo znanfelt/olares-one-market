@@ -10,12 +10,18 @@ data:
   DRAFT_MODEL: "incoai/Qwen3.8-27B-DFlash2-GGUF"
   DRAFT_FILE: "Qwen3.8-27B-DFlash2-Q4_K_M.gguf"
   MODEL_ALIAS: "qwen3.8-27b-dflash2"
-  # 200K context matches the community-validated bayerhazard config
-  # (Olares One RTX 5090M 24GB, turbo4 KV, DFlash2 n-max 7 → 80-110 t/s).
+  # 200K context on kvarn4 KV cache — sits comfortably under 24 GB alongside
+  # the UD-Q4_K_XL target and the DFlash2 Q4_K_M drafter.
   CTX_SIZE: "204800"
   THREADS: "16"
   SPEC_DRAFT_N_MAX: "7"
-  CACHE_TYPE: "turbo4"
+  # BeeLlama KV cache: kvarn4 target, kvarn2 draft. kvarn is BeeLlama's
+  # rotated low-bit KV format (successor to TurboQuant turbo3/4). Under
+  # kvarn the intrinsic exact suffix stays at 128 tokens; --kv-tail-tokens
+  # raises that to 1024 for the target cache.
+  CACHE_TYPE: "kvarn4"
+  DRAFT_CACHE_TYPE: "kvarn2"
+  KV_TAIL_TOKENS: "1024"
   CHAT_TEMPLATE_URL: "https://huggingface.co/froggeric/Qwen-Fixed-Chat-Templates/resolve/855bffc49448e299789730ff92c9b8d834d6cc14/chat_template.jinja"
 ---
 apiVersion: apps/v1
@@ -51,7 +57,13 @@ spec:
               name: shared-models
       containers:
         - name: llamacpp-qwen38-dflash-server
-          image: "docker.io/aamsellem/buun-llama-cpp-dflash:0.2.0"
+          # BeeLlama CUDA 13.3 server build. Requires the Olares R610 driver
+          # bump (beclab/Olares#4100). Tag pins to release v0.4.6 published
+          # 2026-09-08. Successor to spiritbuun/buun-llama-cpp: newer llama.cpp
+          # base that parses the Qwen 3.8 tensor layout the old buun 0.2.0
+          # image tripped over (866 vs 862 tensors), plus DFlash1+2 and the
+          # kvarn KV cache family.
+          image: "ghcr.io/anbeeld/beellama.cpp:server-cuda13-v0.4.6"
           command: ["/bin/bash", "-c"]
           args:
             - |
@@ -113,19 +125,31 @@ spec:
                 touch /config/chat_template.jinja.ok
               fi
 
-              exec /usr/local/bin/llama-server \
+              # BeeLlama server. Key flag differences vs the old buun 0.2.0 stack:
+              #   --spec-type draft-dflash (was: dflash)
+              #   --spec-draft-model     (was: --model-draft)
+              #   --spec-draft-ngl all   (was: --n-gpu-layers-draft 99)
+              #   --spec-draft-type-k/v kvarn2  (owned draft KVarN cache)
+              #   --spec-dm-controller profit   (DFlash1 profit controller;
+              #                                  DFlash2 uses its fixed block
+              #                                  limit regardless)
+              #   --kv-tail-tokens 1024         (raise KVarN exact suffix)
+              exec /app/llama-server \
                 --model "$SHARED_DIR/$TARGET_FILE" \
-                --model-draft "$SHARED_DIR/$DRAFT_FILE" \
-                --spec-type dflash \
+                --spec-type draft-dflash \
+                --spec-draft-model "$SHARED_DIR/$DRAFT_FILE" \
+                --spec-draft-ngl all \
+                --spec-draft-n-max "${SPEC_DRAFT_N_MAX:-7}" \
+                --spec-dm-controller profit \
                 --alias "$MODEL_ALIAS" \
                 --host 0.0.0.0 --port 8000 \
                 --n-gpu-layers 99 \
-                --n-gpu-layers-draft 99 \
-                --spec-draft-n-max "${SPEC_DRAFT_N_MAX:-7}" \
                 --ctx-size "${CTX_SIZE:-204800}" \
                 --threads "${THREADS:-16}" \
                 --threads-batch "${THREADS:-16}" \
-                --cache-type-k "${CACHE_TYPE:-turbo4}" --cache-type-v "${CACHE_TYPE:-turbo4}" \
+                --cache-type-k "${CACHE_TYPE:-kvarn4}" --cache-type-v "${CACHE_TYPE:-kvarn4}" \
+                --spec-draft-type-k "${DRAFT_CACHE_TYPE:-kvarn2}" --spec-draft-type-v "${DRAFT_CACHE_TYPE:-kvarn2}" \
+                --kv-tail-tokens "${KV_TAIL_TOKENS:-1024}" \
                 --batch-size 512 --ubatch-size 512 \
                 --parallel 1 \
                 --flash-attn on --jinja \
@@ -142,8 +166,8 @@ spec:
               value: "{{ .Values.olaresEnv.OLARES_USER_HUGGINGFACE_TOKEN }}"
             - name: MODELS_DIR
               value: "/models"
-            # HAMi-core "0m" parsing bug workaround. Match the sibling Qwen3.6 DFlash
-            # chart (24400m ≈ 80 MB margin under hardware 24463 MB on the 5090M).
+            # HAMi-core "0m" parsing bug workaround. 24400m leaves ~80 MB
+            # margin under the 5090M's 24463 MB reported ceiling.
             - name: CUDA_DEVICE_MEMORY_LIMIT_0
               value: "24400m"
           ports:

@@ -1,14 +1,14 @@
 metadata:
   title: Qwen38 27B DFlash
-  description: "Qwen3.8 27B with DFlash2 drafter and TurboQuant turbo4 KV on buun llama.cpp — 200K context"
+  description: "Qwen3.8 27B with DFlash2 drafter and kvarn4 KV on BeeLlama CUDA 13.3 — 200K context"
 
 spec:
   fullDescription: |
-    Qwen3.8 27B dense with DFlash2 block-diffusion speculative drafter (n-max 7) via the buun-llama-cpp TurboQuant backend.
+    Qwen3.8 27B dense with DFlash2 block-diffusion speculative drafter (n-max 7) via Anbeeld's BeeLlama fork of llama.cpp on a CUDA 13.3 base.
     Fast experimental sibling to the upstream-pure llamacppqwen38mtpone chart.
     Target: unsloth/Qwen3.8-27B-GGUF/Qwen3.8-27B-UD-Q4_K_XL.gguf.
     Drafter: incoai/Qwen3.8-27B-DFlash2-GGUF/Qwen3.8-27B-DFlash2-Q4_K_M.gguf, with analogalok Q2_K fallback.
     Chat template: froggeric/Qwen-Fixed-Chat-Templates @ 855bffc49448e299789730ff92c9b8d834d6cc14.
-    Profile: 200K context, TurboQuant turbo4, DFlash n-max 7, full target and draft GPU offload.
-    Image: docker.io/aamsellem/buun-llama-cpp-dflash:0.2.0 (same image published for the merged Qwen3.6 DFlash chart).
-    Community-reported throughput on the Olares One (RTX 5090M, 24 GB): 80–110 t/s.
+    Profile: 200K context, kvarn4 target KV + kvarn2 owned draft KV, --kv-tail-tokens 1024, DFlash n-max 7, full target and draft GPU offload.
+    Image: ghcr.io/anbeeld/beellama.cpp:server-cuda13-v0.4.6.
+    Requires the Olares One R610 driver (610.57.04); the CUDA 13.3 base image will not start on the stock R595 driver. Driver bump tracked at beclab/Olares#4100.
