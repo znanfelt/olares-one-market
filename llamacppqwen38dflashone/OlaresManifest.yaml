@@ -1,0 +1,101 @@
+olaresManifest.version: '0.10.0'
+olaresManifest.type: app
+apiVersion: 'v2'
+metadata:
+  name: llamacppqwen38dflashone
+  icon: https://orales-one-market.aamsellem.workers.dev/icons/llamacppqwen38dflashone.png
+  description: "Experimental Qwen3.8 27B DFlash2 + TurboQuant via pinned buun llama.cpp fork — 96K starting profile, reasoning ON"
+  appid: llamacppqwen38dflashone
+  title: Qwen38 27B DFlash
+  version: '1.0.0'
+  categories:
+    - LLM Chat
+    - AI Agents
+  bento:
+    family: qwen
+    size_label: "27B"
+    badge: dflash2 · turboquant · experimental
+    hero:
+      value: "TBD t/s"
+      label: "DFlash2 · 96K start"
+    specs:
+      - { label: "context", value: "96K start" }
+      - { label: "vram", value: "24 GB" }
+    capabilities:
+      tool_calling: true
+      vision:       false
+      audio:        false
+      mtp:          false
+    stack: "buun-llama-cpp · DFlash2 · TurboQuant turbo3 · froggeric template"
+entrances:
+  - name: llamacppqwen38dflashone
+    port: 8000
+    host: llamacppqwen38dflashone
+    title: Qwen38 27B DFlash
+    icon: https://orales-one-market.aamsellem.workers.dev/icons/llamacppqwen38dflashone.png
+    openMethod: window
+    authLevel: internal
+spec:
+  versionName: 1.0.0
+  upgradeDescription: |
+    v1.0.0: initial experimental DFlash2/TurboQuant sibling to llamacppqwen38mtpone. Uses docker.io/aamsellem/buun-llama-cpp-dflash:0.2.0, the existing pinned buun DFlash image used by the repository's Qwen3.6 chart. The image digest and exact Qwen3.8 flag compatibility remain validation items before production publication. No performance claim is made; hero value remains TBD t/s.
+
+    Target: unsloth/Qwen3.8-27B-GGUF/Qwen3.8-27B-UD-Q4_K_XL.gguf. Drafter: incoai/Qwen3.8-27B-DFlash2-GGUF/Qwen3.8-27B-DFlash2-Q4_K_M.gguf, with analogalok/Qwen3.8-27B-DFlash2-Q2_K-GGUF/Qwen3.8-27B-DFlash2-Q2_K.gguf as the documented fallback. Shared target path and filename match the Qwen3.8 MTP chart to avoid a duplicate target download.
+
+    Starting policy is memory-first: 96K context, TurboQuant turbo3 cache syntax inherited from the verified existing buun chart, batch/ubatch 512, parallel 1, and full target/drafter GPU offload. Promote context or change cache policy only after on-device measurement.
+  fullDescription: |
+    Experimental fast-tier Qwen3.8 27B coding-agent chart using external DFlash2 speculative decoding and the buun-llama-cpp TurboQuant backend.
+
+    This is not a replacement for llamacppqwen38mtpone. The MTP chart remains the stable upstream-pure baseline; this chart deliberately uses the experimental buun fork for DFlash2 and compressed KV-cache behavior.
+
+    Stack:
+      - Image: docker.io/aamsellem/buun-llama-cpp-dflash:0.2.0 (derived from spiritbuun/buun-llama-cpp; image digest and exact Qwen3.8 flag verification pending)
+      - Target: unsloth/Qwen3.8-27B-GGUF/Qwen3.8-27B-UD-Q4_K_XL.gguf (~17.6 GB, shared with the Qwen3.8 MTP chart)
+      - Drafter: incoai/Qwen3.8-27B-DFlash2-GGUF/Qwen3.8-27B-DFlash2-Q4_K_M.gguf (~1.1 GB)
+      - Drafter fallback: analogalok/Qwen3.8-27B-DFlash2-Q2_K-GGUF/Qwen3.8-27B-DFlash2-Q2_K.gguf (~705 MB)
+      - Chat template: froggeric/Qwen-Fixed-Chat-Templates @ 855bffc49448e299789730ff92c9b8d834d6cc14
+      - Starting context: 96K, with 64K as the first fallback
+      - KV cache: TurboQuant turbo3 flags currently supported by the existing buun chart; VBR/Turbo4 remains a follow-up after binary help verification
+      - Reasoning: DeepSeek format and reasoning preservation enabled
+
+    Required validation before publishing performance numbers: verify the image digest and binary help output, install on Olares One, test health/chat/thinking/non-thinking/tool calls, compare target-only against DFlash2, and sweep n-max 4/5/7 plus stable context points. On-device performance is intentionally TBD.
+
+    The first launch downloads the shared target and a separate DFlash2 drafter from Hugging Face. Configure the Olares Hugging Face token when required. The server exposes an OpenAI-compatible API on port 8000.
+  developer: aamsellem
+  website: https://github.com/aamsellem/olares-one-market
+  sourceCode: https://github.com/spiritbuun/buun-llama-cpp
+  submitter: aamsellem
+  locale:
+    - en-US
+  license:
+    - text: MIT
+      url: https://github.com/ggml-org/llama.cpp/blob/master/LICENSE
+  limitedCpu: 16
+  requiredCpu: 4
+  requiredDisk: 30Gi
+  limitedDisk: 45Gi
+  limitedMemory: 40Gi
+  requiredMemory: 20Gi
+  requiredGpu: 1Gi
+  limitedGpu: 24Gi
+  supportArch:
+    - amd64
+permission:
+  appData: true
+options:
+  apiTimeout: 0
+  dependencies:
+    - name: olares
+      version: '>=1.12.3-0'
+      type: system
+envs:
+  - envName: OLARES_USER_HUGGINGFACE_SERVICE
+    required: false
+    applyOnChange: true
+    valueFrom:
+      envName: OLARES_USER_HUGGINGFACE_SERVICE
+  - envName: OLARES_USER_HUGGINGFACE_TOKEN
+    required: false
+    applyOnChange: true
+    valueFrom:
+      envName: OLARES_USER_HUGGINGFACE_TOKEN

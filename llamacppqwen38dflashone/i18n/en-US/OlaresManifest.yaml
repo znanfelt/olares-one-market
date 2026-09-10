@@ -1,0 +1,14 @@
+metadata:
+  title: Qwen38 27B DFlash
+  description: "Experimental Qwen3.8 27B DFlash2 + TurboQuant via buun llama.cpp fork — 96K starting profile, reasoning ON"
+
+spec:
+  fullDescription: |
+    Experimental Qwen3.8 27B DFlash2 coding-agent chart using the buun-llama-cpp TurboQuant backend.
+    This is the fast experimental sibling to the stable upstream-pure llamacppqwen38mtpone chart.
+    Target: unsloth/Qwen3.8-27B-GGUF/Qwen3.8-27B-UD-Q4_K_XL.gguf.
+    Drafter: incoai/Qwen3.8-27B-DFlash2-GGUF/Qwen3.8-27B-DFlash2-Q4_K_M.gguf, with analogalok Q2_K fallback.
+    Chat template: froggeric/Qwen-Fixed-Chat-Templates @ 855bffc49448e299789730ff92c9b8d834d6cc14.
+    Starting profile: 96K context, TurboQuant turbo3, DFlash n-max 7, full target and draft GPU offload.
+    Image: docker.io/aamsellem/buun-llama-cpp-dflash:0.2.0. Image digest and exact Qwen3.8 flag verification remain pending before performance publication.
+    On-device performance is TBD; no speed claim is made.
