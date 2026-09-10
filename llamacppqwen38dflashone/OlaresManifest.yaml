@@ -7,7 +7,7 @@ metadata:
   description: "Qwen3.8 27B with DFlash2 drafter and TurboQuant turbo4 KV on buun llama.cpp — 200K context, community-validated on Olares One"
   appid: llamacppqwen38dflashone
   title: Qwen38 27B DFlash
-  version: '1.0.0'
+  version: '1.0.1'
   categories:
     - LLM Chat
     - AI Agents
@@ -36,8 +36,10 @@ entrances:
     openMethod: window
     authLevel: internal
 spec:
-  versionName: 1.0.0
+  versionName: 1.0.1
   upgradeDescription: |
+    v1.0.1: removes --reasoning-preserve and --reasoning-format from the llama-server command line. First on-device install of v1.0.0 on the buun-llama-cpp-dflash:0.2.0 image crashed at startup with 'error: invalid argument: --reasoning-preserve'. Reasoning parsing is now handled client-side; the pinned froggeric chat template is still applied via --jinja + --chat-template-file. No other runtime flags changed. See PR #21 comment 5613857673 for the captured server log.
+
     v1.0.0: Qwen3.8-27B DFlash2 chart tuned to the community-validated Olares One configuration reported in aamsellem/olares-one-market#19 (comment 5560770922): UD-Q4_K_XL target + DFlash2-Q4_K_M drafter (n-max 7), TurboQuant turbo4 K/V, 200K context.
 
     Uses docker.io/aamsellem/buun-llama-cpp-dflash:0.2.0 — the same buun image already published under this repository for the merged Qwen3.6 DFlash chart. Deployment enabled by default. Sibling to llamacppqwen38mtpone: the MTP chart remains the upstream-pure baseline; this chart is the fast experimental TurboQuant/DFlash2 profile.
